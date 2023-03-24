@@ -91,10 +91,10 @@ class ColorReproduction():
 
         listing = listing[start:start + num_wave]
 
-        self.images, self.size_image = fcr.Read_Capture(path, listing)
+        self.images, self.size_image = fcr.read_capture(path, listing)
 
         if self.wavelengths is None:
-            self.wavelengths = fcr.Read_Wavelength_Capture(listing, self.separators)
+            self.wavelengths = fcr.read_wavelength_capture(listing, self.separators)
 
         self.charge_cie()
 
@@ -103,8 +103,8 @@ class ColorReproduction():
         Reproduce Color CIE 1931. 
 
         Args:
-            select_wavelengths (list[int], optional): list the wavelengths per color reproduction. Defaults is 
-            self.wavelengths.
+            select_wavelengths (list[int], optional): list the wavelengths per color
+            reproduction. Defaults is self.wavelengths.
 
         Returns:
             image_RGB(np.ndarray): Image in RGB type uint8
@@ -119,14 +119,15 @@ class ColorReproduction():
 
             if len(set(select_wavelengths)) != len(select_wavelengths):
                 raise ValueError(f'Values repeated in select wavelentghs: {select_wavelengths}')
-            
+
             select_wavelengths.sort()
             index_wavelengths = []
             for wavelength in select_wavelengths:
                 try:
                     index = self.wavelengths.index(wavelength)
-                except ValueError:
-                    raise ValueError(f'Not Wavelength {wavelength} in self.wavelengths : {self.wavelengths}')
+                except ValueError as error:
+                    raise ValueError(f'Not Wavelength {wavelength} ' +
+                                    f'in self.wavelengths : {self.wavelengths}') from error
 
                 index_wavelengths.append(index)
 
@@ -139,13 +140,14 @@ class ColorReproduction():
             pesos_ecu = self.pesos_ecu[select_wavelengths]
 
         # Coeficientes
-        Coef = (self.cie_1931[select_wavelengths, 1:] * (np.ones((3, 1)) * self.illuminant_d65[select_wavelengths, 1].T).T).T
-        N = np.sum(Coef, axis=1)
+        esc = (np.ones((3, 1)) * self.illuminant_d65[select_wavelengths, 1].T).T
+        coef = (self.cie_1931[select_wavelengths, 1:] * esc).T
+        sum_n = np.sum(coef, axis=1)
 
         # Reproduccion de color usando CIE
 
-        xyz = np.dot(Coef, (self.images[select_wavelengths, :].T * pesos_ecu).T).T
-        xyz = xyz / N[1]
+        xyz = np.dot(coef, (self.images[select_wavelengths, :].T * pesos_ecu).T).T
+        xyz = xyz / sum_n[1]
 
         rgb = transforms.xyz2rgb(xyz)
         shape_imag = list(self.size_image)

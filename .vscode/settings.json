@@ -1,9 +1,15 @@
 {
     "python.linting.pylintEnabled": true,
     "python.linting.enabled": true,
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true
+    },
     "python.linting.pylintArgs": [
         "--init-hook",
         "import sys; sys.path.append('C:/Users/cuerv/OneDrive/Documentos/Color_Reproduction_API')",
         "--disable=E0015",
+        "--extension-pkg-whitelist=cv2",
+        "--generated-members=cv2.*"
     ]
 }
