@@ -37,10 +37,17 @@ def Read_Wavelength_Capture(listing, separators: Union[str, str] = None):
     if separators is None:
         separators = [r'\(', r'\)']
     
-    p = re.compile(r'(?<=' + separators[0] + r')\d\d\d(?='+ separators[1] + r')')
+    pattern = re.compile(r'(?<=' + separators[0] + r')\d\d\d(?='+ separators[1] + r')')
     wavelength = []
     for name in sorted(listing):
-        val = int(p.findall(name)[0])
+        try:
+            val = int(pattern.findall(name)[0])
+        except IndexError:
+            raise ValueError(f'Separators not found in image {name} separators: {separators}')
+        
+        except ValueError:
+            raise ValueError(f'Separators not found in image {name} separators: {separators}')
+
         wavelength.append(val)
     return wavelength
 

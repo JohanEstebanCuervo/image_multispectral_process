@@ -14,7 +14,7 @@ from methods import transforms
 from methods import color_repro as fcr
 from methods.interpolate import interpolate_cie_illuminant
 
-class ColorReproduction:
+class ColorReproduction():
 
     """docstring for ColorReprocution"""
 
@@ -25,7 +25,6 @@ class ColorReproduction:
         self.wavelengths = None
         self.cie_1931 = None
         self.illuminant_d65 = None
-        self.select_wavelengths = 'ALL'
         self.size_image = None
         self.pesos_ecu = None
         self.separators = None
@@ -99,28 +98,45 @@ class ColorReproduction:
 
         self.charge_cie()
 
-    def reproduccion_cie_1931(self) -> np.ndarray:
+    def reproduccion_cie_1931(self, select_wavelengths: list[int] = None) -> np.ndarray:
         """
         Reproduce Color CIE 1931. 
+
+        Args:
+            select_wavelengths (list[int], optional): list the wavelengths per color reproduction. Defaults is 
+            self.wavelengths.
 
         Returns:
             image_RGB(np.ndarray): Image in RGB type uint8
         """
 
-        if self.select_wavelengths == 'ALL':
+        if select_wavelengths is None:
+
             select_wavelengths = range(np.shape(self.images)[0])
 
         else:
-            select_wavelengths = []
-            for wavelength in self.select_wavelengths:
-                index = self.wavelengths.index(wavelength)
-                select_wavelengths.append(index)
+            select_wavelengths = list(select_wavelengths)
+
+            if len(set(select_wavelengths)) != len(select_wavelengths):
+                raise ValueError(f'Values repeated in select wavelentghs: {select_wavelengths}')
+            
+            select_wavelengths.sort()
+            index_wavelengths = []
+            for wavelength in select_wavelengths:
+                try:
+                    index = self.wavelengths.index(wavelength)
+                except ValueError:
+                    raise ValueError(f'Not Wavelength {wavelength} in self.wavelengths : {self.wavelengths}')
+
+                index_wavelengths.append(index)
+
+            select_wavelengths = index_wavelengths
 
         if self.pesos_ecu is None:
-            pesos_ecu = np.ones(len(self.images))
+            pesos_ecu = np.ones(len(select_wavelengths))
 
         else:
-            pesos_ecu = self.pesos_ecu
+            pesos_ecu = self.pesos_ecu[select_wavelengths]
 
         # Coeficientes
         Coef = (self.cie_1931[select_wavelengths, 1:] * (np.ones((3, 1)) * self.illuminant_d65[select_wavelengths, 1].T).T).T
@@ -134,6 +150,6 @@ class ColorReproduction:
         rgb = transforms.xyz2rgb(xyz)
         shape_imag = list(self.size_image)
         shape_imag.append(3)
-        im_rgb = (np.array(np.reshape(rgb, shape_imag))*255).astype('uint8')
+        im_rgb = np.reshape(rgb, shape_imag)
 
         return im_rgb

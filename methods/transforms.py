@@ -145,6 +145,7 @@ def xyz2rgb(values: np.ndarray) -> np.ndarray:
 
     result = (matrix@table_val.T).T
     result[np.where(result>1)] = 1
+    result[np.where(result<0)] = 0
 
     result = invert_g(result)
 
