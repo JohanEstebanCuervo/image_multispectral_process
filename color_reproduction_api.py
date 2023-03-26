@@ -98,7 +98,7 @@ class ColorReproduction:
         Args:
             listing (list[str]): names images list
             separators (Union[str, str], optional): Separator initial and final.
-                It should be noted that regular expressions are used. Defaults is [r'\(',r'\)'].
+                It should be noted that regular expressions are used. Defaults is ['(',')'].
 
         Raises:
             ValueError: In case not found value read in image.

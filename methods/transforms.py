@@ -195,7 +195,8 @@ def rotate_image(
         image (np.ndarray): image array
         angle (float): angle to rotate (rad)
         axis (tuple[int, int]): axis of rotation
-        size_out (tuple[int, int], optional): Size image out (Style Numpy). Defaults image input shape.
+        size_out (tuple[int, int], optional): Size image out (Style Numpy).
+            Defaults image input shape.
 
     Returns:
         np.ndarray: _description_

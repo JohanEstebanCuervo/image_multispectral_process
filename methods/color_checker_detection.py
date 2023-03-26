@@ -327,8 +327,12 @@ def interpolate_centers(
 
 
 def generate_masks(
-    centers: list, size_image: tuple[int, int], angle: float, size_square: float
-) -> list[np.ndarray]:
+    centers: list,
+    size_image: tuple[int, int],
+    angle: float,
+    size_square: float,
+    imshow: bool = False,
+) -> tuple[list[np.ndarray], np.ndarray]:
     """
     generates the masks of the colochecker patches
 
@@ -337,21 +341,37 @@ def generate_masks(
         size_image (tuple[int, int]): image size
         angle (float): angle rotation colorchecker
         size_square (float): size edge square
-
+        imshow (bool, optional): show images the process algorithm. Defaults to False.
     Returns:
-        list[np.ndarray]: list mask arrays
+        tuple[list[np.ndarray], np.ndarray]: list mask arrays, number mask image
     """
     masks = []
-    for center in centers:
+
+    mask_numbers = np.zeros(size_image).astype("int")
+
+    for i, center in enumerate(centers):
         mask = np.zeros((size_image), dtype="uint8")
         point1 = center - round(size_square * 0.9 / 2)
         point2 = center + round(size_square * 0.9 / 2)
         cv2.rectangle(mask, point1, point2, (255, 255, 255), -1)
         mask = transforms.rotate_image(mask, -angle, np.flip(center))
-        # cv2.putText(mask, str(i+1), centers[i],cv2.FONT_HERSHEY_TRIPLEX, 1, (0,0,0))
+
+        pos_init = np.array(center + [-size_square // 2.4, size_square // 2.4]).astype(
+            "int"
+        )
+        if imshow:
+            mask_numbers += mask
+            cv2.putText(
+                mask_numbers,
+                str(i + 1),
+                pos_init,
+                cv2.FONT_HERSHEY_TRIPLEX,
+                size_square / 60,
+                (1, 1, 1),
+            )
         _, mask = cv2.threshold(mask, 128, 255, cv2.THRESH_BINARY)
         masks.append(mask)
-    return masks
+    return masks, mask_numbers
 
 
 def sorted_centers(
@@ -483,7 +503,9 @@ def color_checker_detection(
         centers_int, angle, size_square, images_list, size_color_checker
     )
 
-    masks = generate_masks(centers_org, size_image, angle, size_square)
+    masks, mask_number = generate_masks(
+        centers_org, size_image, angle, size_square, imshow
+    )
 
     if imshow:
         imagen = np.zeros(size_image, dtype="uint8")
@@ -492,12 +514,9 @@ def color_checker_detection(
         imagen[tuple(lista)] = 255
         func.imshow("contornos filtradose interpolación de centros", imagen)
 
-        imagen = np.zeros(size_image, dtype="int")
-        for mask in masks:
-            imagen += mask
-
-        image[np.where(imagen == 255)] = 255
-        func.imshow("masks", imagen)
+        image[np.where(mask_number == 255)] = 255
+        image[np.where(mask_number == 1)] = 1
+        func.imshow("masks", mask_number)
         func.imshow("imagen con masks", image)
 
     return masks

@@ -8,7 +8,7 @@ from color_reproduction_api import ColorReproduction
 from methods.color_checker_detection import color_checker_detection
 from methods.color_repro import imshow
 
-folder = "imgs/2023_3_20_12_18"
+folder = "imgs/2023_2_21_15_36"
 
 color = ColorReproduction()
 color.separators = [r"\_", r"n"]
