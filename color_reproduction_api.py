@@ -6,6 +6,7 @@ plays color in multispectral images given in a folder
 """
 
 import os
+import re
 from typing import Union
 import numpy as np
 import pandas as pd
@@ -14,12 +15,16 @@ from methods import transforms
 from methods import color_repro as fcr
 from methods.interpolate import interpolate_cie_illuminant
 
-class ColorReproduction():
 
-    """docstring for ColorReprocution"""
+class ColorReproduction:
+    """
+    Object contain methods for read, color reproduction, color correction
+    for multispectral images
+    """
 
     def __init__(self):
 
+        self.matrix_images = None
         self.images = None
         self.mask = None
         self.wavelengths = None
@@ -35,21 +40,25 @@ class ColorReproduction():
         This Function toma the wavelentghs list an charge the CIE X,Y,Z
         values.
 
-        The wavelengths not multiply values 5. Its aproximate with linear regression
+        The wavelengths not multiply values 5. Its aproximate with linear regression.
+        use the attribute self.wavelengths for chage cie values.
 
         Returns:
-            Union[np.ndarray, np.ndarray]: _description_
+            Union[np.ndarray, np.ndarray]: CIE_1931_table
         """
-        if self.wavelengths is None:
-            raise ValueError('Not inicialice variable self.wavelengths charge'
-                             + ' capture or asign list with values wavelengths')
 
-        name = 'data/CIETABLES.xls'
-        hoja = pd.read_excel(name, skiprows=4, sheet_name='Table4')
-        hoja2 = pd.read_excel(name, skiprows=4, sheet_name='Table1')
+        if self.wavelengths is None:
+            raise ValueError(
+                "Not inicialice variable self.wavelengths charge"
+                + " capture or asign list with values wavelengths"
+            )
+
+        name = "data/CIETABLES.xls"
+        hoja = pd.read_excel(name, skiprows=4, sheet_name="Table4")
+        hoja2 = pd.read_excel(name, skiprows=4, sheet_name="Table1")
 
         d65 = np.array(hoja2.iloc[:, [0, 2]])
-        cie = np.array(hoja.iloc[: - 1, :4])
+        cie = np.array(hoja.iloc[:-1, :4])
 
         wavelengths_cie = list(cie[:, 0])
         wavelengths_d65 = list(d65[:, 0])
@@ -78,29 +87,85 @@ class ColorReproduction():
 
         return self.cie_1931, self.illuminant_d65
 
-    def load_capture(self, path: str, num_wave: int, start: int =0) -> None:
+    def read_wavelength_capture(
+        self, listing: list[str], separators: Union[str, str] = None
+    ) -> list[int]:
         """
-        Load Capture MultiSpectral Image in folder.
+        gets the wavelength of each image according to its name.
+        Using a start and end separator. This separator must be special since in
+        case of repetition it takes the first number.
 
         Args:
-            path (str): Image Folder 
-            num_wave (int): number of wavelengths or images per capture
-            start (int, optional): position initial of the first image. Defaults to 0.
+            listing (list[str]): names images list
+            separators (Union[str, str], optional): Separator initial and final.
+                It should be noted that regular expressions are used. Defaults is [r'\(',r'\)'].
+
+        Raises:
+            ValueError: In case not found value read in image.
+
+        Returns:
+            list[int]: wavelengths values.
         """
-        listing = os.listdir(path)
 
-        listing = listing[start:start + num_wave]
+        if separators is None:
+            separators = [r"\(", r"\)"]
 
-        self.images, self.size_image = fcr.read_capture(path, listing)
+        pattern = re.compile(
+            r"(?<=" + separators[0] + r")\d\d\d(?=" + separators[1] + r")"
+        )
+        wavelength = []
+        for name in sorted(listing):
+            try:
+                val = int(pattern.findall(name)[0])
+            except IndexError as error:
+                raise ValueError(
+                    "Separators not found in "
+                    + f"image {name} separators: {separators}"
+                ) from error
 
-        if self.wavelengths is None:
-            self.wavelengths = fcr.read_wavelength_capture(listing, self.separators)
+            except ValueError as error:
+                raise ValueError(
+                    "Separators not found in "
+                    + f"image {name} separators: {separators}"
+                ) from error
+
+            wavelength.append(val)
+
+        self.wavelengths = wavelength
 
         self.charge_cie()
 
+        return wavelength
+
+    def load_capture(
+        self, path: str, num_wave: int, start: int = 0, up_wave: bool = False
+    ) -> None:
+        """
+        Load Capture MultiSpectral Image in folder.
+
+        if up_wave it is necessary to preset the argument self.separators
+
+        Args:
+            path (str): Image Folder.
+            num_wave (int): number of wavelengths or images per capture.
+            start (int, optional): position initial of the first image. Defaults to 0.
+            up_wave (bool, optional): update the self.wavelengths attribute according to
+            the uploaded capture. Defaults is True.
+        """
+        listing = os.listdir(path)
+
+        listing = listing[start : start + num_wave]
+
+        self.images, self.matrix_images, self.size_image = fcr.read_capture(
+            path, listing
+        )
+
+        if self.wavelengths is None and up_wave is True:
+            self.wavelengths = self.read_wavelength_capture(listing, self.separators)
+
     def reproduccion_cie_1931(self, select_wavelengths: list[int] = None) -> np.ndarray:
         """
-        Reproduce Color CIE 1931. 
+        Reproduce Color CIE 1931.
 
         Args:
             select_wavelengths (list[int], optional): list the wavelengths per color
@@ -112,13 +177,15 @@ class ColorReproduction():
 
         if select_wavelengths is None:
 
-            select_wavelengths = range(np.shape(self.images)[0])
+            select_wavelengths = range(np.shape(self.matrix_images)[0])
 
         else:
             select_wavelengths = list(select_wavelengths)
 
             if len(set(select_wavelengths)) != len(select_wavelengths):
-                raise ValueError(f'Values repeated in select wavelentghs: {select_wavelengths}')
+                raise ValueError(
+                    f"Values repeated in select wavelentghs: {select_wavelengths}"
+                )
 
             select_wavelengths.sort()
             index_wavelengths = []
@@ -126,8 +193,10 @@ class ColorReproduction():
                 try:
                     index = self.wavelengths.index(wavelength)
                 except ValueError as error:
-                    raise ValueError(f'Not Wavelength {wavelength} ' +
-                                    f'in self.wavelengths : {self.wavelengths}') from error
+                    raise ValueError(
+                        f"Not Wavelength {wavelength} "
+                        + f"in self.wavelengths : {self.wavelengths}"
+                    ) from error
 
                 index_wavelengths.append(index)
 
@@ -146,7 +215,9 @@ class ColorReproduction():
 
         # Reproduccion de color usando CIE
 
-        xyz = np.dot(coef, (self.images[select_wavelengths, :].T * pesos_ecu).T).T
+        xyz = np.dot(
+            coef, (self.matrix_images[select_wavelengths, :].T * pesos_ecu).T
+        ).T
         xyz = xyz / sum_n[1]
 
         rgb = transforms.xyz2rgb(xyz)

@@ -2,9 +2,7 @@
 Programmed by: Johan Esteban Cuervo Chica
 
 """
-import pickle
 import itertools
-import re
 from typing import Union
 
 import numpy as np
@@ -33,76 +31,36 @@ def ext_masks(folder: str, listing: list[str]) -> list[np.ndarray]:
     return masks
 
 
-def read_capture(folder: str, listing: list[str]) -> Union[np.ndarray, tuple]:
+def read_capture(folder: str, listing: list[str]) -> Union[list, np.ndarray, tuple]:
     """
     read a list of images from a folder,
-    groups them into an array of number_pixels * number_images
+    groups them into an array of  number_images * number_pixels
 
     Args:
         folder (str): folder path
         listing (list[str]): names images list
 
     Returns:
-        Union[np.ndarray, tuple]: matrix the images numpixels* number_images, shape origin image
+        Union[list, np.ndarray, tuple]:list images, matrix the images number_images*numpixels,
+        shape origin image
     """
     imagenespatron = []
+    images = []
     for name in sorted(listing):
         imagen = cv2.imread(folder + "/" + name, cv2.IMREAD_GRAYSCALE)
 
-        # se convierte la imagen en una columna y se concatena con las demas del espectro
+        # se convierte la imagen en una fila y se concatena con las demas del espectro
+        images.append(imagen)
         imagenespatron = np.concatenate(
             (imagenespatron, np.reshape(imagen, (-1))), axis=0
         )
 
     shape_imag = np.shape(imagen)
 
-    # se redimensiona a  Filas * N imagenes multiespectrales
+    # se redimensiona a N imagenes multiespectrales * Num_pixels image
     imagenespatron = imagenespatron.reshape(len(listing), -1)
 
-    return imagenespatron / 255, shape_imag
-
-
-def read_wavelength_capture(
-    listing: list[str], separators: Union[str, str] = None
-) -> list[int]:
-    """
-    gets the wavelength of each image according to its name.
-    Using a start and end separator. This separator must be special since in
-    case of repetition it takes the first number.
-
-    Args:
-        listing (list[str]): names images list
-        separators (Union[str, str], optional): Separator initial and final.
-            It should be noted that regular expressions are used. Defaults is ['\(','\)'].
-
-    Raises:
-        ValueError: In case not found value read in image.
-
-    Returns:
-        list[int]: wavelengths values.
-    """
-
-    if separators is None:
-        separators = [r"\(", r"\)"]
-
-    pattern = re.compile(r"(?<=" + separators[0] + r")\d\d\d(?=" + separators[1] + r")")
-    wavelength = []
-    for name in sorted(listing):
-        try:
-            val = int(pattern.findall(name)[0])
-        except IndexError as error:
-            raise ValueError(
-                "Separators not found in " + f"image {name} separators: {separators}"
-            ) from error
-
-        except ValueError as error:
-            raise ValueError(
-                "Separators not found in " + f"image {name} separators: {separators}"
-            ) from error
-
-        wavelength.append(val)
-
-    return wavelength
+    return images, imagenespatron / 255, shape_imag
 
 
 def ideal_color_patch_pixel(color_check, masks):
@@ -239,13 +197,15 @@ def offset(im):
 def imshow(titulo, imagen):
 
     if len(np.shape(imagen)) == 2:
-        imagen1 = np.zeros((np.shape(imagen)[0], np.shape(imagen)[1], 3))
+        imagen1 = np.zeros((np.shape(imagen)[0], np.shape(imagen)[1], 3)).astype(
+            "uint8"
+        )
         imagen1[:, :, 0] = imagen
         imagen1[:, :, 1] = imagen
         imagen1[:, :, 2] = imagen
         imagen = imagen1
 
-    plt.imshow(imagen)
+    plt.imshow(imagen, vmin=0, vmax=255)
     plt.title(titulo)
     plt.axis("off")
     plt.show()
@@ -272,182 +232,182 @@ def Error_de_reproduccion(imagenes_RGB, masks, color_check):
     return np.reshape(error, (-1, len(masks)))
 
 
-#%% Funciones CCM para una imagen
+#%% Funciones ccm para una imagen
 # Color Correction matriz linear
-def CCM_Linear(im_RGB, colorn, masks, shape_imag=(480, 640, 3)):
-    entrada = RGB_IN(im_RGB, masks).T
+def CCM_Linear(im_rgb, colorn, masks, shape_imag=(480, 640, 3)):
+    entrada = RGB_IN(im_rgb, masks).T
     entrada = np.concatenate((entrada, np.ones((1, np.shape(entrada)[1]))))
     colorn = colorn.T / 255
 
-    PseudoINV = np.linalg.pinv(entrada)
+    pseudoinv = np.linalg.pinv(entrada)
 
-    Ccm = np.dot(colorn, PseudoINV)
-    rgb = np.reshape(im_RGB, (-1, 3)).T
+    ccm = np.dot(colorn, pseudoinv)
+    rgb = np.reshape(im_rgb, (-1, 3)).T
     rgb = np.concatenate((rgb, np.ones((1, np.shape(rgb)[1]))))
-    rgb = np.dot(Ccm, rgb)
+    rgb = np.dot(ccm, rgb)
     im_rgb = np.reshape(rgb.T, shape_imag)
     im_rgb = recorte(im_rgb)
-    return im_rgb, Ccm
+    return im_rgb, ccm
 
 
 # Color Correction matriz Compound
-def CCM_Compound(im_RGB, colorn, masks, shape_imag=(480, 640, 3)):
-    entrada = RGB_IN(im_RGB, masks).T
-    # entradaN = N_IN(N, masks)
-    # entrada = np.concatenate((entrada,entradaN))
+def CCM_Compound(im_rgb, colorn, masks, shape_imag=(480, 640, 3)):
+    entrada = RGB_IN(im_rgb, masks).T
+    # entrada_n = N_IN(N, masks)
+    # entrada = np.concatenate((entrada,entrada_n))
     entrada = np.concatenate((entrada, np.ones((1, np.shape(entrada)[1]))))
     colorn = np.log(colorn.T / 255)
 
-    PseudoINV = np.linalg.pinv(entrada)
+    pseudoinv = np.linalg.pinv(entrada)
 
-    Ccm = np.dot(colorn, PseudoINV)
-    rgb = np.reshape(im_RGB, (-1, 3)).T
+    ccm = np.dot(colorn, pseudoinv)
+    rgb = np.reshape(im_rgb, (-1, 3)).T
     # rgbn= np.concatenate((rgb,np.reshape(N,(1,-1))))
     rgb = np.concatenate((rgb, np.ones((1, np.shape(rgb)[1]))))
 
-    lnrgb = np.dot(Ccm, rgb)
+    lnrgb = np.dot(ccm, rgb)
     rgb = np.exp(lnrgb)
     im_rgb = np.reshape(rgb.T, shape_imag)
     im_rgb = recorte(im_rgb)
-    return im_rgb, Ccm
+    return im_rgb, ccm
 
 
 # Color Correction matriz Logarithm
-def CCM_Logarithm(im_RGB, colorn, masks, shape_imag=(480, 640, 3)):
-    entrada = np.log(offset(RGB_IN(im_RGB, masks).T))
-    # entradaN = np.log(offset(N_IN(N, masks)))
-    # entrada = np.concatenate((entrada,entradaN))
+def CCM_Logarithm(im_rgb, colorn, masks, shape_imag=(480, 640, 3)):
+    entrada = np.log(offset(RGB_IN(im_rgb, masks).T))
+    # entrada_n = np.log(offset(N_IN(N, masks)))
+    # entrada = np.concatenate((entrada,entrada_n))
     entrada = np.concatenate((entrada, np.ones((1, np.shape(entrada)[1]))))
     colorn = colorn.T / 255
 
-    PseudoINV = np.linalg.pinv(entrada)
+    pseudoinv = np.linalg.pinv(entrada)
 
-    Ccm = np.dot(colorn, PseudoINV)
-    lnrgb = np.log(offset(np.reshape(im_RGB, (-1, 3)).T))
+    ccm = np.dot(colorn, pseudoinv)
+    lnrgb = np.log(offset(np.reshape(im_rgb, (-1, 3)).T))
     # lnrgbn = np.concatenate((lnrgb,np.log(offset(np.reshape(N,(1,-1))))))
     lnrgb = np.concatenate((lnrgb, np.ones((1, np.shape(lnrgb)[1]))))
 
-    rgb = np.dot(Ccm, lnrgb)
+    rgb = np.dot(ccm, lnrgb)
     im_rgb = np.reshape(rgb.T, shape_imag)
     im_rgb = recorte(im_rgb)
-    return im_rgb, Ccm
+    return im_rgb, ccm
 
 
 # Color Correction matriz Polynomial Con NIR
-def CCM_Polynomial_N(im_RGB, N, colorn, masks, shape_imag=(480, 640, 3)):
+def CCM_Polynomial_N(im_rgb, N, colorn, masks):
 
-    entrada = RGB_IN(im_RGB, masks).T
-    entradaN = N_IN(N, masks)
-    entrada = np.concatenate((entrada, entradaN))
+    entrada = RGB_IN(im_rgb, masks).T
+    entrada_n = N_IN(N, masks)
+    entrada = np.concatenate((entrada, entrada_n))
 
-    R2 = entrada[0, :] ** 2
-    G2 = entrada[1, :] ** 2
-    B2 = entrada[2, :] ** 2
-    N2 = entradaN**2
-    RG = entrada[0, :] * entrada[1, :]
-    RB = entrada[0, :] * entrada[2, :]
-    RN = entrada[0, :] * entradaN
-    GB = entrada[1, :] * entrada[2, :]
-    GN = entrada[1, :] * entradaN
-    BN = entrada[2, :] * entradaN
+    r2 = entrada[0, :] ** 2
+    g2 = entrada[1, :] ** 2
+    b2 = entrada[2, :] ** 2
+    n2 = entrada_n**2
+    rg = entrada[0, :] * entrada[1, :]
+    rb = entrada[0, :] * entrada[2, :]
+    rn = entrada[0, :] * entrada_n
+    gb = entrada[1, :] * entrada[2, :]
+    gn = entrada[1, :] * entrada_n
+    bn = entrada[2, :] * entrada_n
 
-    entrada = np.concatenate((entrada, [R2]))
-    entrada = np.concatenate((entrada, [G2]))
-    entrada = np.concatenate((entrada, [B2]))
-    entrada = np.concatenate((entrada, N2))
-    entrada = np.concatenate((entrada, [RG]))
-    entrada = np.concatenate((entrada, [RB]))
-    entrada = np.concatenate((entrada, RN))
-    entrada = np.concatenate((entrada, [GB]))
-    entrada = np.concatenate((entrada, GN))
-    entrada = np.concatenate((entrada, BN))
+    entrada = np.concatenate((entrada, [r2]))
+    entrada = np.concatenate((entrada, [g2]))
+    entrada = np.concatenate((entrada, [b2]))
+    entrada = np.concatenate((entrada, n2))
+    entrada = np.concatenate((entrada, [rg]))
+    entrada = np.concatenate((entrada, [rb]))
+    entrada = np.concatenate((entrada, rn))
+    entrada = np.concatenate((entrada, [gb]))
+    entrada = np.concatenate((entrada, gn))
+    entrada = np.concatenate((entrada, bn))
     entrada = np.concatenate((entrada, np.ones((1, np.shape(entrada)[1]))))
     colorn = colorn.T / 255
 
-    PseudoINV = np.linalg.pinv(entrada)
+    pseudoinv = np.linalg.pinv(entrada)
 
-    entradaN = np.reshape(N, (1, -1))
+    entrada_n = np.reshape(N, (1, -1))
 
-    Ccm = np.dot(colorn, PseudoINV)
-    rgb = np.reshape(im_RGB, (-1, 3)).T
-    rgb = np.concatenate((rgb, entradaN))
-    R2 = rgb[0, :] ** 2
-    G2 = rgb[1, :] ** 2
-    B2 = rgb[2, :] ** 2
-    N2 = entradaN**2
-    RG = rgb[0, :] * rgb[1, :]
-    RB = rgb[0, :] * rgb[2, :]
-    RN = rgb[0, :] * entradaN
-    GB = rgb[1, :] * rgb[2, :]
-    GN = rgb[1, :] * entradaN
-    BN = rgb[2, :] * entradaN
+    ccm = np.dot(colorn, pseudoinv)
+    rgb = np.reshape(im_rgb, (-1, 3)).T
+    rgb = np.concatenate((rgb, entrada_n))
+    r2 = rgb[0, :] ** 2
+    g2 = rgb[1, :] ** 2
+    b2 = rgb[2, :] ** 2
+    n2 = entrada_n**2
+    rg = rgb[0, :] * rgb[1, :]
+    rb = rgb[0, :] * rgb[2, :]
+    rn = rgb[0, :] * entrada_n
+    gb = rgb[1, :] * rgb[2, :]
+    gn = rgb[1, :] * entrada_n
+    bn = rgb[2, :] * entrada_n
 
-    rgb = np.concatenate((rgb, [R2]))
-    rgb = np.concatenate((rgb, [G2]))
-    rgb = np.concatenate((rgb, [B2]))
-    rgb = np.concatenate((rgb, N2))
-    rgb = np.concatenate((rgb, [RG]))
-    rgb = np.concatenate((rgb, [RB]))
-    rgb = np.concatenate((rgb, RN))
-    rgb = np.concatenate((rgb, [GB]))
-    rgb = np.concatenate((rgb, GN))
-    rgb = np.concatenate((rgb, BN))
+    rgb = np.concatenate((rgb, [r2]))
+    rgb = np.concatenate((rgb, [g2]))
+    rgb = np.concatenate((rgb, [b2]))
+    rgb = np.concatenate((rgb, n2))
+    rgb = np.concatenate((rgb, [rg]))
+    rgb = np.concatenate((rgb, [rb]))
+    rgb = np.concatenate((rgb, rn))
+    rgb = np.concatenate((rgb, [gb]))
+    rgb = np.concatenate((rgb, gn))
+    rgb = np.concatenate((rgb, bn))
     rgb = np.concatenate((rgb, np.ones((1, np.shape(rgb)[1]))))
 
-    rgb = np.dot(Ccm, rgb)
+    rgb = np.dot(ccm, rgb)
     im_rgb = np.reshape(rgb.T, (480, 640, 3))
     im_rgb = recorte(im_rgb)
-    return im_rgb, Ccm, R2
+    return im_rgb, ccm, r2
 
 
 # Color Correction matriz Polynomial
-def CCM_Polynomial(im_RGB, colorn, masks, shape_imag=(480, 640, 3)):
+def CCM_Polynomial(im_rgb, colorn, masks, shape_imag=(480, 640, 3)):
 
-    entrada = RGB_IN(im_RGB, masks).T
+    entrada = RGB_IN(im_rgb, masks).T
 
-    R2 = entrada[0, :] ** 2
-    G2 = entrada[1, :] ** 2
-    B2 = entrada[2, :] ** 2
-    RG = entrada[0, :] * entrada[1, :]
-    RB = entrada[0, :] * entrada[2, :]
-    GB = entrada[1, :] * entrada[2, :]
+    r2 = entrada[0, :] ** 2
+    g2 = entrada[1, :] ** 2
+    b2 = entrada[2, :] ** 2
+    rg = entrada[0, :] * entrada[1, :]
+    rb = entrada[0, :] * entrada[2, :]
+    gb = entrada[1, :] * entrada[2, :]
 
-    entrada = np.concatenate((entrada, [R2]))
-    entrada = np.concatenate((entrada, [G2]))
-    entrada = np.concatenate((entrada, [B2]))
-    entrada = np.concatenate((entrada, [RG]))
-    entrada = np.concatenate((entrada, [RB]))
-    entrada = np.concatenate((entrada, [GB]))
+    entrada = np.concatenate((entrada, [r2]))
+    entrada = np.concatenate((entrada, [g2]))
+    entrada = np.concatenate((entrada, [b2]))
+    entrada = np.concatenate((entrada, [rg]))
+    entrada = np.concatenate((entrada, [rb]))
+    entrada = np.concatenate((entrada, [gb]))
 
     entrada = np.concatenate((entrada, np.ones((1, np.shape(entrada)[1]))))
     colorn = colorn.T / 255
 
-    PseudoINV = np.linalg.pinv(entrada)
+    pseudoinv = np.linalg.pinv(entrada)
 
-    Ccm = np.dot(colorn, PseudoINV)
-    rgb = np.reshape(im_RGB, (-1, 3)).T
-    R2 = rgb[0, :] ** 2
-    G2 = rgb[1, :] ** 2
-    B2 = rgb[2, :] ** 2
-    RG = rgb[0, :] * rgb[1, :]
-    RB = rgb[0, :] * rgb[2, :]
-    GB = rgb[1, :] * rgb[2, :]
+    ccm = np.dot(colorn, pseudoinv)
+    rgb = np.reshape(im_rgb, (-1, 3)).T
+    r2 = rgb[0, :] ** 2
+    g2 = rgb[1, :] ** 2
+    b2 = rgb[2, :] ** 2
+    rg = rgb[0, :] * rgb[1, :]
+    rb = rgb[0, :] * rgb[2, :]
+    gb = rgb[1, :] * rgb[2, :]
 
-    rgb = np.concatenate((rgb, [R2]))
-    rgb = np.concatenate((rgb, [G2]))
-    rgb = np.concatenate((rgb, [B2]))
-    rgb = np.concatenate((rgb, [RG]))
-    rgb = np.concatenate((rgb, [RB]))
-    rgb = np.concatenate((rgb, [GB]))
+    rgb = np.concatenate((rgb, [r2]))
+    rgb = np.concatenate((rgb, [g2]))
+    rgb = np.concatenate((rgb, [b2]))
+    rgb = np.concatenate((rgb, [rg]))
+    rgb = np.concatenate((rgb, [rb]))
+    rgb = np.concatenate((rgb, [gb]))
     rgb = np.concatenate((rgb, np.ones((1, np.shape(rgb)[1]))))
 
-    rgb = np.dot(Ccm, rgb)
+    rgb = np.dot(ccm, rgb)
     im_rgb = np.reshape(rgb.T, shape_imag)
     im_rgb = recorte(im_rgb)
-    return im_rgb, Ccm, R2
+    return im_rgb, ccm, r2
 
 
-#%% FUNCIONES CCM Para multiples imagenes
+#%% FUNCIONES ccm Para multiples imagenes
 # Color Correction matriz linear
 def CCM_Linear_Train(archivo):
     datatrain = pd.read_csv(archivo, sep=",", names=range(1, 7))
@@ -457,8 +417,8 @@ def CCM_Linear_Train(archivo):
     entrada = np.concatenate((entrada, np.ones((1, np.shape(entrada)[1]))))
     colorn = colorn.T / 255
 
-    PseudoINV = np.linalg.pinv(entrada)
-    Ccm_Linear = np.dot(colorn, PseudoINV)
+    pseudoinv = np.linalg.pinv(entrada)
+    Ccm_Linear = np.dot(colorn, pseudoinv)
 
     return Ccm_Linear
 
@@ -472,9 +432,9 @@ def CCM_Compound_Train(archivo):
     entrada = np.concatenate((entrada, np.ones((1, np.shape(entrada)[1]))))
     colorn = np.log(colorn.T / 255)
 
-    PseudoINV = np.linalg.pinv(entrada)
+    pseudoinv = np.linalg.pinv(entrada)
 
-    Ccm_Compound = np.dot(colorn, PseudoINV)
+    Ccm_Compound = np.dot(colorn, pseudoinv)
 
     return Ccm_Compound
 
@@ -489,9 +449,9 @@ def CCM_Logarithm_Train(archivo):
     entrada = np.concatenate((entrada, np.ones((1, np.shape(entrada)[1]))))
     colorn = colorn.T / 255
 
-    PseudoINV = np.linalg.pinv(entrada)
+    pseudoinv = np.linalg.pinv(entrada)
 
-    Ccm_Logatirhm = np.dot(colorn, PseudoINV)
+    Ccm_Logatirhm = np.dot(colorn, pseudoinv)
 
     return Ccm_Logatirhm
 
@@ -503,49 +463,49 @@ def CCM_Polynomial_Train(archivo):
     entrada = datatrain[:, :3].T / 255
     colorn = datatrain[:, 3:]
 
-    R2 = entrada[0, :] ** 2
-    G2 = entrada[1, :] ** 2
-    B2 = entrada[2, :] ** 2
-    RG = entrada[0, :] * entrada[1, :]
-    RB = entrada[0, :] * entrada[2, :]
-    GB = entrada[1, :] * entrada[2, :]
+    r2 = entrada[0, :] ** 2
+    g2 = entrada[1, :] ** 2
+    b2 = entrada[2, :] ** 2
+    rg = entrada[0, :] * entrada[1, :]
+    rb = entrada[0, :] * entrada[2, :]
+    gb = entrada[1, :] * entrada[2, :]
 
-    entrada = np.concatenate((entrada, [R2]))
-    entrada = np.concatenate((entrada, [G2]))
-    entrada = np.concatenate((entrada, [B2]))
-    entrada = np.concatenate((entrada, [RG]))
-    entrada = np.concatenate((entrada, [RB]))
-    entrada = np.concatenate((entrada, [GB]))
+    entrada = np.concatenate((entrada, [r2]))
+    entrada = np.concatenate((entrada, [g2]))
+    entrada = np.concatenate((entrada, [b2]))
+    entrada = np.concatenate((entrada, [rg]))
+    entrada = np.concatenate((entrada, [rb]))
+    entrada = np.concatenate((entrada, [gb]))
 
     entrada = np.concatenate((entrada, np.ones((1, np.shape(entrada)[1]))))
     colorn = colorn.T / 255
 
-    PseudoINV = np.linalg.pinv(entrada)
+    pseudoinv = np.linalg.pinv(entrada)
 
-    Ccm_Polynomial = np.dot(colorn, PseudoINV)
+    Ccm_Polynomial = np.dot(colorn, pseudoinv)
 
     return Ccm_Polynomial
 
 
-#%% CCM test
+#%% ccm test
 # Color Correction matriz linear
-def CCM_Linear_Test(im_RGB, Ccm):
-    shape_imag = np.shape(im_RGB)
-    rgb = np.reshape(im_RGB, (-1, 3)).T
+def CCM_Linear_Test(im_rgb, ccm):
+    shape_imag = np.shape(im_rgb)
+    rgb = np.reshape(im_rgb, (-1, 3)).T
     rgb = np.concatenate((rgb, np.ones((1, np.shape(rgb)[1]))))
-    rgb = np.dot(Ccm, rgb)
+    rgb = np.dot(ccm, rgb)
     im_rgb = np.reshape(rgb.T, shape_imag)
     im_rgb = recorte(im_rgb)
     return im_rgb
 
 
 # Color Correction matriz Compound
-def CCM_Compound_Test(im_RGB, Ccm):
-    shape_imag = np.shape(im_RGB)
-    rgb = np.reshape(im_RGB, (-1, 3)).T
+def CCM_Compound_Test(im_rgb, ccm):
+    shape_imag = np.shape(im_rgb)
+    rgb = np.reshape(im_rgb, (-1, 3)).T
     rgb = np.concatenate((rgb, np.ones((1, np.shape(rgb)[1]))))
 
-    lnrgb = np.dot(Ccm, rgb)
+    lnrgb = np.dot(ccm, rgb)
     rgb = np.exp(lnrgb)
     im_rgb = np.reshape(rgb.T, shape_imag)
     im_rgb = recorte(im_rgb)
@@ -553,38 +513,38 @@ def CCM_Compound_Test(im_RGB, Ccm):
 
 
 # Color Correction matriz Logarithm
-def CCM_Logarithm_Test(im_RGB, Ccm):
-    shape_imag = np.shape(im_RGB)
-    lnrgb = np.log(offset(np.reshape(im_RGB, (-1, 3)).T))
+def CCM_Logarithm_Test(im_rgb, ccm):
+    shape_imag = np.shape(im_rgb)
+    lnrgb = np.log(offset(np.reshape(im_rgb, (-1, 3)).T))
 
     lnrgb = np.concatenate((lnrgb, np.ones((1, np.shape(lnrgb)[1]))))
 
-    rgb = np.dot(Ccm, lnrgb)
+    rgb = np.dot(ccm, lnrgb)
     im_rgb = np.reshape(rgb.T, shape_imag)
     im_rgb = recorte(im_rgb)
     return im_rgb
 
 
 # Color Correction matriz Polynomial
-def CCM_Polynomial_Test(im_RGB, Ccm):
-    shape_imag = np.shape(im_RGB)
-    rgb = np.reshape(im_RGB, (-1, 3)).T
-    R2 = rgb[0, :] ** 2
-    G2 = rgb[1, :] ** 2
-    B2 = rgb[2, :] ** 2
-    RG = rgb[0, :] * rgb[1, :]
-    RB = rgb[0, :] * rgb[2, :]
-    GB = rgb[1, :] * rgb[2, :]
+def CCM_Polynomial_Test(im_rgb, ccm):
+    shape_imag = np.shape(im_rgb)
+    rgb = np.reshape(im_rgb, (-1, 3)).T
+    r2 = rgb[0, :] ** 2
+    g2 = rgb[1, :] ** 2
+    b2 = rgb[2, :] ** 2
+    rg = rgb[0, :] * rgb[1, :]
+    rb = rgb[0, :] * rgb[2, :]
+    gb = rgb[1, :] * rgb[2, :]
 
-    rgb = np.concatenate((rgb, [R2]))
-    rgb = np.concatenate((rgb, [G2]))
-    rgb = np.concatenate((rgb, [B2]))
-    rgb = np.concatenate((rgb, [RG]))
-    rgb = np.concatenate((rgb, [RB]))
-    rgb = np.concatenate((rgb, [GB]))
+    rgb = np.concatenate((rgb, [r2]))
+    rgb = np.concatenate((rgb, [g2]))
+    rgb = np.concatenate((rgb, [b2]))
+    rgb = np.concatenate((rgb, [rg]))
+    rgb = np.concatenate((rgb, [rb]))
+    rgb = np.concatenate((rgb, [gb]))
     rgb = np.concatenate((rgb, np.ones((1, np.shape(rgb)[1]))))
 
-    rgb = np.dot(Ccm, rgb)
+    rgb = np.dot(ccm, rgb)
     im_rgb = np.reshape(rgb.T, shape_imag)
     im_rgb = recorte(im_rgb)
     return im_rgb
@@ -602,7 +562,7 @@ def imwrite(titulo, imagen):
     cv2.imwrite(titulo, imagen)
 
 
-def comparacion_color_check(name, im_RGB, color_check_RGB, masks, folder=""):
+def comparacion_color_check(name, im_rgb, color_check_RGB, masks, folder=""):
 
     Grosor = 2
 
@@ -621,7 +581,7 @@ def comparacion_color_check(name, im_RGB, color_check_RGB, masks, folder=""):
         fila = np.zeros((60, Grosor, 3))
         for j in range(6):
 
-            parchei = im_RGB[np.where(255 == masks[6 * i + j])] * 255
+            parchei = im_rgb[np.where(255 == masks[6 * i + j])] * 255
             if len(np.where(255 == masks[6 * i + j])[0]) < 3600:
                 longitud = 3600 - len(np.where(255 == masks[6 * i + j])[0])
                 parchei = np.concatenate((parchei, parchei[:longitud, :]))
@@ -638,79 +598,6 @@ def comparacion_color_check(name, im_RGB, color_check_RGB, masks, folder=""):
 
     imshow(folder + "/Comparación Color_Check - " + name, imagen.astype(int))
     imwrite(folder + "/Comparacion Color_Check - " + name + ".png", imagen / 255)
-
-
-#%%
-
-
-def ReproduccionCie19312(
-    imagenes_patron, Pesos_ecu, shape_imag=(480, 640, 3), select_wavelengths="All"
-):
-
-    if select_wavelengths == "All":
-        select_wavelengths = range(np.shape(imagenes_patron)[0])
-
-    D65 = np.array(
-        [
-            [410, 91.486000],
-            [450, 117.008000],
-            [470, 114.861000],
-            [490, 108.811000],
-            [505, 108.578000],
-            [530, 107.689000],
-            [560, 100.000000],
-            [590, 88.685600],
-            [600, 90.006200],
-            [620, 87.698700],
-            [630, 83.288600],
-            [650, 80.026800],
-            [720, 61.604000],
-        ]
-    )
-
-    CIE1931 = np.array(
-        [
-            [410, 0.043510, 0.001210, 0.207400],
-            [450, 0.336200, 0.038000, 1.772110],
-            [470, 0.195360, 0.090980, 1.287640],
-            [490, 0.032010, 0.208020, 0.465180],
-            [505, 0.002400, 0.407300, 0.212300],
-            [530, 0.165500, 0.862000, 0.042160],
-            [560, 0.594500, 0.995000, 0.003900],
-            [590, 1.026300, 0.757000, 0.001100],
-            [600, 1.062200, 0.631000, 0.000800],
-            [620, 0.854450, 0.381000, 0.000190],
-            [630, 0.642400, 0.265000, 0.000050],
-            [650, 0.283500, 0.107000, 0.000000],
-            [720, 0.002899, 0.001047, 0.000000],
-        ]
-    )
-
-    XYZ2RGB = np.array(
-        [
-            [3.2406, -1.5372, -0.4986],
-            [-0.9689, 1.8758, 0.0415],
-            [0.0557, -0.2040, 1.0570],
-        ]
-    )
-
-    #% Coeficientes
-    Coef = (
-        CIE1931[select_wavelengths, 1:]
-        * (np.ones((3, 1)) * D65[select_wavelengths, 1].T).T
-    ).T
-    N = np.sum(Coef, axis=1)
-    #%  Reproduccion de color usando CIE
-
-    xyz = np.dot(Coef, (imagenes_patron[select_wavelengths, :].T * Pesos_ecu).T).T
-    # print(N)
-    xyz = xyz / N[1]
-
-    rgb = recorte(np.dot(XYZ2RGB, xyz.T).T)
-
-    im_RGB = np.reshape(rgb, shape_imag)
-
-    return im_RGB
 
 
 def mejor_combinacion(
@@ -738,24 +625,24 @@ def mejor_combinacion(
             )
         # #%%  Reproduccion de color usando CIE
 
-        im_RGB = ReproduccionCie1931(imagenes_patron, select_wavelengths=Comb)
-        # im_Lab= cv2.cvtColor(im_RGB, cv2.COLOR_RGB2LAB)
-        errores = Error_de_reproduccion([im_RGB], masks, color_check)
+        im_rgb = ReproduccionCie1931(imagenes_patron, select_wavelengths=Comb)
+        # im_Lab= cv2.cvtColor(im_rgb, cv2.COLOR_RGB2LAB)
+        errores = Error_de_reproduccion([im_rgb], masks, color_check)
 
         error = error_funtions(errores, type_error)
         # print(error_media)
         if error < min_error:
             min_error = error
             mejor_comb = Comb
-        # fun.imshow('Imagen reproducción CIE 1931',im_RGB)
+        # fun.imshow('Imagen reproducción CIE 1931',im_rgb)
 
     #%%  Reproduccion de color usando CIE
-    im_RGB = ReproduccionCie1931(imagenes_patron, select_wavelengths=mejor_comb)
-    imshow("IR ERGB CIE 1931 im " + str(int(Cant_Image)), im_RGB)
+    im_rgb = ReproduccionCie1931(imagenes_patron, select_wavelengths=mejor_comb)
+    imshow("IR ERGB CIE 1931 im " + str(int(Cant_Image)), im_rgb)
     if imagen_write == "on":
         imwrite(
             "Resultados/Imagenes/IR ERGB CIE 1931 im " + str(int(Cant_Image)) + ".png",
-            im_RGB,
+            im_rgb,
         )
 
     return mejor_comb, min_error
