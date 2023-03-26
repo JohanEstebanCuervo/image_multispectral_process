@@ -467,9 +467,11 @@ def color_checker_detection(
             print("Color checker estimate digital sg size (14,10) patches")
 
     angulo_est, size_square = angle_size_estimation(contours, number_edges)
-    centers_int, _, orientation = interpolate_centers(centers, -angulo_est)
+    centers_int, _, orientation = interpolate_centers(
+        centers, -angulo_est, size_color_checker
+    )
 
-    angle = angle_regression(centers_int, orientation)
+    angle = angle_regression(centers_int, orientation, size_color_checker)
     if angle * angulo_est < 0:
         angle = -angle
 
@@ -477,7 +479,9 @@ def color_checker_detection(
     print(f"angle estimate centers:  {angle * 180 / np.pi}")
 
     centers_int = centers_int.astype(int)
-    centers_org = sorted_centers(centers_int, angle, size_square, images_list)
+    centers_org = sorted_centers(
+        centers_int, angle, size_square, images_list, size_color_checker
+    )
 
     masks = generate_masks(centers_org, size_image, angle, size_square)
 
