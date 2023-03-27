@@ -14,6 +14,7 @@ import pandas as pd
 from methods import transforms
 from methods import color_repro as fcr
 from methods.interpolate import interpolate_cie_illuminant
+from methods.color_checker_detection import color_checker_detection
 
 
 class ColorReproduction:
@@ -26,14 +27,13 @@ class ColorReproduction:
 
         self.matrix_images = None
         self.images = None
-        self.mask = None
+        self.masks = None
         self.wavelengths = None
         self.cie_1931 = None
         self.illuminant_d65 = None
         self.size_image = None
         self.pesos_ecu = None
         self.separators = None
-        self.transforms = transforms
 
     def charge_cie(self) -> Union[np.ndarray, np.ndarray]:
         """
@@ -226,3 +226,28 @@ class ColorReproduction:
         im_rgb = np.reshape(rgb, shape_imag)
 
         return im_rgb
+
+    def color_checker_detection(
+        self, imshow: bool | str = False, size_color_checker: tuple[int, int] = None
+    ) -> list[np.ndarray]:
+        """
+        Generate mask for colorchecker classical and digital sg. T
+
+        This function uses classic image processing, which is why it
+        can be very unstable when faced with variations in position,
+        saturation and size of the card. Use with caution. It may not
+        work most of the time.
+
+        Args:
+            imshow (bool | str, optional): show images the process algorithm
+                options (True, False, 'end'). Defaults to False.
+            size_color_checker (tuple[int, int], optional): colorchecker size patchs usually
+                (6,4) or (14,10). Defaults to (Automatic detection).
+
+        Returns:
+            list[np.ndarray]: list masks patchs colorchecker
+        """
+
+        self.masks = color_checker_detection(self.images, imshow, size_color_checker)
+
+        return self.masks

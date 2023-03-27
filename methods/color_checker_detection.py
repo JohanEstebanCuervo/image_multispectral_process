@@ -331,7 +331,7 @@ def generate_masks(
     size_image: tuple[int, int],
     angle: float,
     size_square: float,
-    imshow: bool = False,
+    imshow: bool | str = False,
 ) -> tuple[list[np.ndarray], np.ndarray]:
     """
     generates the masks of the colochecker patches
@@ -341,7 +341,8 @@ def generate_masks(
         size_image (tuple[int, int]): image size
         angle (float): angle rotation colorchecker
         size_square (float): size edge square
-        imshow (bool, optional): show images the process algorithm. Defaults to False.
+        imshow (bool | str, optional): show images the process algorithm
+            options (True, False, "end"). Defaults to False.
     Returns:
         tuple[list[np.ndarray], np.ndarray]: list mask arrays, number mask image
     """
@@ -359,7 +360,7 @@ def generate_masks(
         pos_init = np.array(center + [-size_square // 2.4, size_square // 2.4]).astype(
             "int"
         )
-        if imshow:
+        if imshow is True or str(imshow).lower() == "end":
             mask_numbers += mask
             cv2.putText(
                 mask_numbers,
@@ -440,7 +441,7 @@ def sorted_centers(
 
 def color_checker_detection(
     images_list: list[np.ndarray],
-    imshow: bool = False,
+    imshow: bool | str = False,
     size_color_checker: tuple[int, int] = None,
 ) -> list[np.ndarray]:
     """
@@ -453,22 +454,23 @@ def color_checker_detection(
 
     Args:
         images_list (list[np.ndarray]): list images multispectral
-        imshow (bool, optional): show images the process algorithm. Defaults to False.
+        imshow (bool | str, optional): show images the process algorithm
+            options (True, False, 'end'). Defaults to False.
         size_color_checker (tuple[int, int], optional): colorchecker size patchs usually
-            (6,4) or (14,10). Defaults to None.
+            (6,4) or (14,10). Defaults to (Automatic detection).
 
     Returns:
         list[np.ndarray]: list masks patchs colorchecker
     """
     image = images_list[0]
-    if imshow:
+    if imshow is True:
         func.imshow("imagen", image.astype("uint8"))
 
     size_image = np.shape(image)
     contours = contours_images(images_list, imshow)
     contours, number_edges = filter_squeare_cont(contours)
 
-    if imshow:
+    if imshow is True:
         imagen = np.zeros(size_image, dtype="uint8")
         contours = np.array(contours, dtype=object)
         cv2.drawContours(imagen, contours, -1, (255, 255, 255), 2)
@@ -507,16 +509,18 @@ def color_checker_detection(
         centers_org, size_image, angle, size_square, imshow
     )
 
-    if imshow:
+    if imshow is True:
         imagen = np.zeros(size_image, dtype="uint8")
         cv2.drawContours(imagen, contours, -1, (255, 255, 255), 2)
         lista = [centers_int[:, 1], centers_int[:, 0]]
         imagen[tuple(lista)] = 255
         func.imshow("contornos filtradose interpolación de centros", imagen)
+        func.imshow("masks", mask_number)
+
+    if imshow is True or str(imshow).lower() == "end":
 
         image[np.where(mask_number == 255)] = 255
         image[np.where(mask_number == 1)] = 1
-        func.imshow("masks", mask_number)
         func.imshow("imagen con masks", image)
 
     return masks
