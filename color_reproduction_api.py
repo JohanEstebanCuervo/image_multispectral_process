@@ -30,7 +30,7 @@ class ColorReproduction:
         self.cie_1931 = None
         self.illuminant_d65 = None
         self.size_image = None
-        self.pesos_ecu = None
+        self.weigths_ecu = None
         self.separators = None
 
     def charge_cie(self) -> Union[np.ndarray, np.ndarray]:
@@ -161,6 +161,29 @@ class ColorReproduction:
         if self.wavelengths is None and up_wave is True:
             self.wavelengths = self.read_wavelength_capture(listing, self.separators)
 
+    def calculate_ecualization(self, mask: np.ndarray, ideal_value: int) -> list:
+        """
+        calculates the equalization weights of the multispectral
+        image with respect to a gray patch and an ideal value
+
+        Args:
+            mask (np.ndarray): mask patch
+            ideal_value (int): ideal value gray color
+
+        Returns:
+            list: weigths values for wavelength
+        """
+        means = []
+        for image in self.images:
+            parche = image[np.where(mask == 255)]
+            mean_patch = np.mean(parche)
+            means.append(mean_patch)
+
+        equilization_w = np.divide(ideal_value * np.ones(len(means)), np.array(means))
+
+        self.weigths_ecu = equilization_w
+        return equilization_w
+
     def reproduccion_cie_1931(self, select_wavelengths: list[int] = None) -> np.ndarray:
         """
         Reproduce Color CIE 1931.
@@ -200,11 +223,11 @@ class ColorReproduction:
 
             select_wavelengths = index_wavelengths
 
-        if self.pesos_ecu is None:
+        if self.weigths_ecu is None:
             pesos_ecu = np.ones(len(select_wavelengths))
 
         else:
-            pesos_ecu = self.pesos_ecu[select_wavelengths]
+            pesos_ecu = self.weigths_ecu[select_wavelengths]
 
         # Coeficientes
         esc = (np.ones((3, 1)) * self.illuminant_d65[select_wavelengths, 1].T).T

@@ -5,6 +5,7 @@ Module contains algorithms for color_correction
 """
 import re
 import numpy as np
+import json
 
 
 def root(array: np.ndarray, exp: float) -> np.ndarray:
@@ -208,7 +209,13 @@ class ModelCorrection:
 
     def __str__(self):
 
-        return f"Model: input: {self.__input} output: {self.__output}"
+        struct = {
+            "input": self.__input,
+            "output": self.__output,
+            "ccm": (self.ccm.round(3)).tolist(),
+        }
+
+        return json.dumps(struct, indent=4)
 
 
 class ColorCorrection:
@@ -253,14 +260,16 @@ class ColorCorrection:
         self.model = ModelCorrection()
         self.ccm_matrix = {}
 
-    def ccm_write(self, name: str, matrix: np.ndarray) -> None:
+    def model_write(self, name: str) -> None:
         """
         Save the CCM file in format .csv
         Args:
             name (str): name file save.
             matrix (np.ndarray): ccm matrix
         """
-        return None
+
+        with open(name, "wt", encoding="utf8") as file:
+            file.write(str(self.model))
 
     def ccm_read(self, name: str) -> np.ndarray:
 
@@ -343,11 +352,11 @@ class ColorCorrection:
 
         image = self.model.color_correction(rgb_image)
 
-        error = self.__error_correct(image)
+        error = self.error_lab(image)
 
         return image, error
 
-    def __error_correct(self, rgb_imagen):
+    def error_lab(self, rgb_imagen):
 
         error = []
         lab_image = trf.rgb2lab(rgb_imagen)
