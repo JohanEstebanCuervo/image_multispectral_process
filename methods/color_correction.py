@@ -4,8 +4,11 @@ Programmed By: Johan Esteban Cuervo Chica
 Module contains algorithms for color_correction
 """
 import re
-import numpy as np
 import json
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import keras
 
 
 def root(array: np.ndarray, exp: float) -> np.ndarray:
@@ -35,6 +38,7 @@ class ModelCorrection:
         self.str_output = None
         self.size_model = None
         self.ccm = None
+        self.neural_network = None
         self.model = {}
 
         self.__reg1 = re.compile(r"\([rgbn,\d\.]+\)")
@@ -69,7 +73,6 @@ class ModelCorrection:
         return model
 
     def __parser(self, mod_input, type_arg):
-
         model = []
         input_clean = re.sub(r"\s", "", mod_input).lower()
         args = self.__reg1.findall(input_clean)
@@ -127,13 +130,11 @@ class ModelCorrection:
         self.__output = output
 
     def __normalice_vals(self, array: np.ndarray) -> np.ndarray:
-
         return (array.astype("float") + 1) / 256
 
     def __procces_matrix(
         self, model: list, image: np.ndarray, constant: bool = True
     ) -> np.ndarray:
-
         shape_image = np.shape(image)
 
         image_array = image.reshape((-1, shape_image[-1])).astype("float")
@@ -141,7 +142,6 @@ class ModelCorrection:
         input_matrix = []
 
         for mod_input in model:
-
             type_arg = list(mod_input.keys())[0]
 
             if type_arg == "function":
@@ -175,7 +175,6 @@ class ModelCorrection:
         return input_matrix.reshape((-1, len(image_array))).T
 
     def color_correction(self, rgbn_image) -> np.ndarray:
-
         size = np.shape(rgbn_image)
         input_arr = self.__procces_matrix(
             self.model["input"], self.__normalice_vals(rgbn_image)
@@ -192,7 +191,6 @@ class ModelCorrection:
         return im_rgb.astype("uint8")
 
     def train(self, ideal_values, rgbn_values) -> np.ndarray:
-
         model_out = self.__parser(self.__output, "input")
 
         input_arr = self.__procces_matrix(
@@ -207,8 +205,85 @@ class ModelCorrection:
 
         return self.ccm
 
-    def __str__(self):
+    def color_correction_nn(self, rgb_image) -> np.ndarray:
+        shape_image = np.shape(rgb_image)
+        image_array = rgb_image.reshape((-1, shape_image[-1])).astype("float")
 
+        image_array = image_array / 255
+
+        print("predicción")
+        array_out = self.neural_network.predict(image_array, steps=1)
+
+        im_rgb = np.reshape(array_out, shape_image)
+        im_rgb[np.where(im_rgb > 255)] = 255
+        im_rgb[np.where(im_rgb < 0)] = 0
+
+        return im_rgb.astype("uint8")
+
+    def train_nn(
+        self, ideal_values, rgbn_values, epochs=60, batch_size=20
+    ) -> keras.models.Sequential:
+        samples = len(ideal_values)
+        indexs = list(range(samples))
+        np.random.shuffle(indexs)
+        rgbn_values2 = rgbn_values / 255
+
+        y_train = ideal_values[indexs[: int(samples * 0.75)]]
+        x_train = rgbn_values2[indexs[: int(samples * 0.75)]]
+
+        y_val = ideal_values[indexs[int(samples * 0.75) :]]
+        x_val = rgbn_values2[indexs[int(samples * 0.75) :]]
+
+        table = np.concatenate((x_train, y_train), axis=1)
+
+        table = pd.DataFrame(
+            table, columns=["R_in", "G_in", "B_in", "R_out", "G_out", "B_out"]
+        )
+        table = table.sort_values(by=["R_out", "G_out", "B_out"])
+
+        table.to_excel("datos_train.xlsx", "datos", engine="xlsxwriter")
+
+        print(f"sizes trian: {np.shape(x_train)} {np.shape(y_train)}")
+        print(f"sizes test: {np.shape(x_val)} {np.shape(y_val)}")
+
+        if self.neural_network is None:
+            red = keras.models.Sequential(
+                [
+                    keras.layers.Dense(15, activation="sigmoid", input_shape=(3,)),
+                    # Dense(10, activation="sigmoid"),
+                    keras.layers.Dense(3, activation="relu"),
+                ]
+            )
+            red.compile(
+                optimizer="Adam",
+                loss="mean_squared_error",
+                metrics=["mean_absolute_error"],
+            )
+        else:
+            red = self.neural_network
+
+        hist = red.fit(
+            table[["R_in", "G_in", "B_in"]],
+            table[["R_out", "G_out", "B_out"]],
+            batch_size=batch_size,
+            epochs=epochs,
+            validation_data=(x_val, y_val),
+        )
+
+        red.save("Correction_color_neuronal_red.h5")
+
+        plt.plot(hist.history["loss"])
+        plt.plot(hist.history["val_loss"])
+        plt.title("Model loss")
+        plt.ylabel("Loss")
+        plt.xlabel("Epoch")
+        plt.legend(["Train", "Val"], loc="upper right")
+        plt.show()
+
+        self.neural_network = red
+        return red
+
+    def __str__(self):
         struct = {
             "input": self.__input,
             "output": self.__output,
@@ -226,7 +301,6 @@ class ColorCorrection:
     """
 
     def __init__(self) -> None:
-
         self.image_rgbn = None
         self.masks = None
         self.ideal_color_patch = np.array(
@@ -272,15 +346,17 @@ class ColorCorrection:
             file.write(str(self.model))
 
     def ccm_read(self, name: str) -> np.ndarray:
-
         print("hola")
 
-    def create_model(self, input_model, output_model):
+    def load_nn(self, path: str) -> keras.models.Sequential:
+        red = keras.models.load_model(path)
+        self.model.neural_network = red
+        return red
 
+    def create_model(self, input_model, output_model):
         self.model.compile(input_model, output_model)
 
     def __ideal_color_patch_pixel(self):
-
         color_ipmask = np.zeros((0, 3))
         for i, mask in enumerate(self.masks):
             num_pixels = np.shape(np.where(mask == 255))[1]
@@ -314,11 +390,18 @@ class ColorCorrection:
         return parches_rgb
 
     def train(self, rgbn_image) -> np.ndarray:
-
         ideal_values = self.__ideal_color_patch_pixel()
         rgb_values = self.__ext_patchs(rgbn_image)
 
         return self.model.train(ideal_values, rgb_values)
+
+    def train_nn(self, rgb_image, epochs=60, batch_size=20) -> keras.models.Sequential:
+        ideal_values = self.__ideal_color_patch_pixel()
+        rgb_values = self.__ext_patchs(rgb_image)
+
+        return self.model.train_nn(
+            ideal_values, rgb_values, epochs=epochs, batch_size=batch_size
+        )
 
     def color_checker_detection(
         self,
@@ -349,15 +432,16 @@ class ColorCorrection:
         return self.masks
 
     def color_correction(self, rgb_image):
-
         image = self.model.color_correction(rgb_image)
 
-        error = self.error_lab(image)
+        return image
 
-        return image, error
+    def color_correction_nn(self, rgb_image):
+        image = self.model.color_correction_nn(rgb_image)
+
+        return image
 
     def error_lab(self, rgb_imagen):
-
         error = []
         lab_image = trf.rgb2lab(rgb_imagen)
         imagen = lab_image.reshape(-1, 3)

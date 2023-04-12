@@ -355,7 +355,7 @@ def generate_masks(
         point1 = center - round(size_square * 0.9 / 2)
         point2 = center + round(size_square * 0.9 / 2)
         cv2.rectangle(mask, point1, point2, (255, 255, 255), -1)
-        mask = transforms.rotate_image(mask, -angle, np.flip(center))
+        mask = transforms.rotate_image(mask, angle, np.flip(center))
 
         pos_init = np.array(center + [-size_square // 2.4, size_square // 2.4]).astype(
             "int"
