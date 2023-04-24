@@ -23,7 +23,6 @@ class ColorReproduction:
     """
 
     def __init__(self):
-
         self.matrix_images = None
         self.images = None
         self.wavelengths = None
@@ -64,7 +63,6 @@ class ColorReproduction:
         self.cie_1931 = []
 
         for wavelength in self.wavelengths:
-
             if wavelength > 780 or wavelength < 380:
                 self.cie_1931.append([wavelength, 0, 0, 0])
                 self.illuminant_d65.append([wavelength, 0])
@@ -135,6 +133,28 @@ class ColorReproduction:
 
         return wavelength
 
+    def convert_list_images(self, list_images: list[np.ndarray]) -> np.ndarray:
+        """
+        Convierte una lista de imagenes multiespectrales a una imagen de N canales
+        multiespectrales.
+
+        Args:
+            list_images (list[np.ndarray]): Lista de imagenes multiespectrales
+
+        Returns:
+            np.ndarray: imagen (width, height, number channels)
+        """
+
+        array_images = list_images
+        array_images = np.array(array_images)
+        size = list(np.shape(array_images))
+        new_size = size[1:]
+        new_size.append(size[0])
+        array_images = array_images.reshape((size[0], -1)).T
+        array_images = array_images.reshape(new_size)
+
+        return array_images
+
     def load_capture(
         self, path: str, num_wave: int, start: int = 0, up_wave: bool = False
     ) -> None:
@@ -158,7 +178,7 @@ class ColorReproduction:
             path, listing
         )
 
-        if self.wavelengths is None and up_wave is True:
+        if up_wave is True:
             self.wavelengths = self.read_wavelength_capture(listing, self.separators)
 
     def calculate_ecualization(self, mask: np.ndarray, ideal_value: int) -> list:
@@ -197,7 +217,6 @@ class ColorReproduction:
         """
 
         if select_wavelengths is None:
-
             select_wavelengths = range(np.shape(self.matrix_images)[0])
 
         else:

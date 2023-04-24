@@ -19,6 +19,8 @@ FOLDER = r"imgs\2023_3_20_12_18"
 NUM_WAVES = 8
 PATH_RED = "redes_entrenadas/Correction_color_neuronal_red_2.22.h5"
 SEPARATORS = [r"\_", r"n"]  # Si esta entre parentesis puede asignar None
+NUM_MASK = 18
+IDEAL_VALUE = 243
 
 
 def graphic_errors(models: list[str], name_fig: str) -> None:
@@ -56,9 +58,9 @@ if __name__ == "__main__":
     color_correc = ColorCorrection()
     color_correc.color_checker_detection(color.images, imshow="end")
     color_correc.load_nn(PATH_RED)
-    color.calculate_ecualization(color_correc.masks[1], 243)
+    color.calculate_ecualization(color_correc.masks[NUM_MASK], IDEAL_VALUE)
 
-    rgb_im = color.reproduccion_cie_1931([451, 525, 620, 660])
+    rgb_im = color.reproduccion_cie_1931()
     cv2.imwrite("results/images/reproduction.png", np.flip(rgb_im, axis=2))
     imshow("reproducción", rgb_im)
 

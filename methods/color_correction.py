@@ -368,6 +368,53 @@ class ColorCorrection:
 
         return color_ipmask
 
+    def ext_patch(self, image: np.ndarray, mask: np.ndarray) -> np.ndarray:
+        """
+        Extrae los valores de un parche de una imagen
+
+        Args:
+            image (np.ndarray): Imagen de tamaño (Witdh, Height, Channels)
+            mask (np.ndarray): de tamaño (Width, height)
+
+        Raises:
+            IndexError: si la mascara no tiene las dimensiones adecuadas
+            IndexError: si la imagen no tiene las dimensiones adecuadas
+            IndexError: si las dimensiones de la mascara y la imagen no coinciden
+
+        Returns:
+            np.ndarray: values masks size (Num_pixels, Channels)
+        """
+        image = np.array(image)
+        mask = np.array(mask)
+
+        size_image = np.shape(image)
+        size_mask = np.shape(mask)
+
+        if len(size_mask) != 2:
+            raise IndexError(
+                f"Tamaño inesperado de mascara se espera matriz de 2 dimensiones tamaño actual: {size_mask}"
+            )
+        if len(size_image) > 3 or len(size_image) <= 1:
+            raise IndexError(
+                f"Tamaño inesperado de las imagenes. se espera matriz de 2 o 3 dimensiones tamaño actual: {size_image}"
+            )
+        if not np.equal(size_image[:2], size_mask[:2]).all():
+            raise IndexError(
+                f"Tamaño de imagen y de mascaras no coincidentes: {size_image[:2]} != {size_mask[:2]}"
+            )
+
+        if len(size_image) == 2:
+            return image[np.where(mask == 255)]
+
+        patch_val = np.zeros((len(np.where(mask == 255)[0]), 0))
+
+        for index in range(size_image[-1]):
+            channel = image[:, :, index]
+            patch = channel[np.where(mask == 255)].reshape((-1, 1))
+            patch_val = np.concatenate((patch_val, patch), axis=1)
+
+        return patch_val
+
     def __ext_patchs(self, rgb_image):
         parches_r = []
         parches_g = []

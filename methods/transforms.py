@@ -29,7 +29,6 @@ def function_f(arg_x: np.ndarray | float) -> np.ndarray | float:
             return arg_x ** (1 / 3)
 
         else:
-
             return arg_x / (3 * (6 / 29) ** 2) + 4 / 29
     except TypeError:
         pass
@@ -65,7 +64,6 @@ def invert_f(arg_x: np.ndarray | float) -> np.ndarray | float:
             return arg_x**3
 
         else:
-
             return 3 * (delta**2) * (arg_x - 4 / 29)
 
     except TypeError:
@@ -106,7 +104,6 @@ def function_g(arg_x: np.ndarray | int) -> np.ndarray | float:
             return np.power((arg_x + alpha) / 1.055, gamma)
 
         else:
-
             return arg_x / 12.92
 
     except TypeError:
@@ -147,7 +144,6 @@ def invert_g(arg_x: np.ndarray | float) -> np.ndarray | float:
             return (1 + alpha) * np.power(arg_x, 1 / gamma) - alpha
 
         else:
-
             return 12.92 * arg_x
 
     except TypeError:
@@ -200,6 +196,64 @@ def xyz2lab(values: np.ndarray, illuminant: str = "D65") -> np.ndarray:
     result[:, 0] = 116 * table_val[:, 1] - 16
     result[:, 1] = 500 * (table_val[:, 0] - table_val[:, 1])
     result[:, 2] = 200 * (table_val[:, 1] - table_val[:, 2])
+
+    return result.reshape(origin_shape)
+
+
+def rgb2hsv(values: np.ndarray) -> np.ndarray:
+    """
+    Conversión to values RGB to HSV
+
+    Args:
+        values (np.ndarray): Values to transform
+
+    Returns:
+        np.ndarray: transformed values
+    """
+
+    values = np.array(values)
+    origin_shape = np.shape(values)
+
+    table_val = values.reshape((-1, 3)) / 255
+
+    h_array = []
+    s_array = []
+    v_array = []
+    for val_rgb in table_val:
+        index_max = np.argmax(val_rgb)
+        val_max = np.max(val_rgb)
+        val_min = np.min(val_rgb)
+
+        if val_max == val_min:
+            hue = 0
+
+        elif index_max == 0:
+            if val_rgb[1] > val_rgb[2]:
+                hue = 60 * (val_rgb[1] - val_rgb[2]) / (val_max - val_min)
+
+            else:
+                hue = 60 * (val_rgb[1] - val_rgb[2]) / (val_max - val_min) + 360
+
+        elif index_max == 1:
+            hue = 60 * (val_rgb[2] - val_rgb[0]) / (val_max - val_min) + 120
+
+        else:
+            hue = 60 * (val_rgb[0] - val_rgb[1]) / (val_max - val_min) + 240
+
+        h_array.append(hue)
+
+        if val_max == 0:
+            saturation = 0
+        else:
+            saturation = 1 - val_min / val_max
+
+        s_array.append(saturation)
+        v_array.append(val_max)
+
+    result = np.zeros_like(table_val, dtype="float")
+    result[:, 0] = h_array
+    result[:, 1] = s_array
+    result[:, 2] = v_array
 
     return result.reshape(origin_shape)
 
