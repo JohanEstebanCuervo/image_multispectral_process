@@ -23,9 +23,7 @@ if __name__ == "__main__":
     color = ColorReproduction()
     color.separators = SEPARATORS
 
-    color.load_capture(
-        r"imgs\Pruebas de repetibilidad\2023_4_23_21_27_50", NUM_WAVES, up_wave=True
-    )
+    color.load_capture(os.listdir(FOLDER)[0], NUM_WAVES, up_wave=True)
 
     color_correc = ColorCorrection()
     color_correc.color_checker_detection(color.images, imshow=False)
@@ -38,7 +36,7 @@ if __name__ == "__main__":
     index = 0
     for capture_folder in os.listdir(FOLDER):
         print(capture_folder, end="\r")
-        color.load_capture(FOLDER + f"/{capture_folder}", NUM_WAVES, up_wave=True)
+        color.load_capture(FOLDER + f"/{capture_folder}", NUM_WAVES, up_wave=False)
         image_m = color.convert_list_images(color.images)
 
         # values_patch = list(
