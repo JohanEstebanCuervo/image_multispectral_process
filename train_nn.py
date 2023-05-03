@@ -10,16 +10,18 @@ from methods.color_correction import ColorCorrection
 from methods.color_repro import imshow
 
 
-FOLDER = r"imgs\2023_3_20_12_18"
+CAPTURE = r"imgs\reestruct_capture\color_check_macro\bd_0123.micpy"
+MASK = 18  # 0 TO 23 values
+IDEAL_VALUE = 243
 
 color = ColorReproduction()
 color.separators = [r"\_", r"n"]
 
-color.load_capture(FOLDER, 8, up_wave=True)
+color.load_capture(CAPTURE)
 
 color_correc = ColorCorrection()
-color_correc.color_checker_detection(color.images, imshow="end")
-color.calculate_ecualization(color_correc.masks[18], 243)
+color_correc.color_checker_detection(color.image_mul.images, imshow="end")
+color.calculate_ecualization(color_correc.masks[MASK], IDEAL_VALUE)
 
 
 rgb_im = color.reproduccion_cie_1931()

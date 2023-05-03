@@ -26,7 +26,7 @@ if __name__ == "__main__":
     color = ColorReproduction()
     color.separators = SEPARATORS
 
-    color.load_capture(FOLDER, NUM_WAVES, up_wave=True, start=0)
+    color.load_folder_capture(FOLDER, NUM_WAVES, up_wave=True, start=0)
     print(color.wavelengths)
     color_correc = ColorCorrection()
     color_correc.load_nn(PATH_RED)

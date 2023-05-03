@@ -15,10 +15,10 @@ from methods.formatter_plots import formatter_graph
 
 # %% Datos entrada
 
-FOLDER = r"imgs\2023_3_20_12_18"
-NUM_WAVES = 8
+CAPTURE = r"imgs\reestruct_capture\color_check_macro\bd_0123.micpy"
+# NUM_WAVES = 8
 PATH_RED = "redes_entrenadas/Correction_color_neuronal_red_2.22.h5"
-SEPARATORS = [r"\_", r"n"]  # Si esta entre parentesis puede asignar None
+# SEPARATORS = [r"\_", r" "]  # Si esta entre parentesis puede asignar None
 NUM_MASK = 18
 IDEAL_VALUE = 243
 
@@ -43,23 +43,23 @@ def graphic_errors(models: list[str], name_fig: str) -> None:
     axes.set_ylabel("$\Delta E_{Lab}$")
     formatter_graph(fig, [axes])
     fig.savefig(f"results/errors/{name_fig}.pdf")
-    fig.show()
-    plt.waitforbuttonpress()
+    plt.show()
 
 
 if __name__ == "__main__":
     # %% Inicialización de objetos
 
     color = ColorReproduction()
-    color.separators = SEPARATORS
+    # color.separators = SEPARATORS
 
-    color.load_capture(FOLDER, NUM_WAVES, up_wave=True)
+    color.load_capture(CAPTURE)
+    # color.load_folder_capture(FOLDER, NUM_WAVES, up_wave=True)
 
     color_correc = ColorCorrection()
-    color_correc.color_checker_detection(color.images, imshow="end")
+    color_correc.color_checker_detection(color.image_mul.images, imshow="end")
     color_correc.load_nn(PATH_RED)
-    color.calculate_ecualization(color_correc.masks[NUM_MASK], IDEAL_VALUE)
-
+    weigths = color.calculate_ecualization(color_correc.masks[NUM_MASK], IDEAL_VALUE)
+    print(weigths)
     rgb_im = color.reproduccion_cie_1931()
     cv2.imwrite("results/images/reproduction.png", np.flip(rgb_im, axis=2))
     imshow("reproducción", rgb_im)

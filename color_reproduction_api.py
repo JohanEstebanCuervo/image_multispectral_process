@@ -14,6 +14,7 @@ import pandas as pd
 from methods import transforms
 from methods import color_repro as fcr
 from methods.interpolate import interpolate_cie_illuminant
+from methods.multispectral_image import MultiSpectralImage
 
 
 class ColorReproduction:
@@ -23,13 +24,10 @@ class ColorReproduction:
     """
 
     def __init__(self):
-        self.matrix_images = None
-        self.images = None
-        self.wavelengths = None
+        self.image_mul = MultiSpectralImage()
         self.cie_1931 = None
         self.illuminant_d65 = None
         self.size_image = None
-        self.weigths_ecu = None
         self.separators = None
 
     def charge_cie(self) -> Union[np.ndarray, np.ndarray]:
@@ -38,15 +36,15 @@ class ColorReproduction:
         values.
 
         The wavelengths not multiply values 5. Its aproximate with linear regression.
-        use the attribute self.wavelengths for chage cie values.
+        use the attribute self.image_mul.wavelengths for chage cie values.
 
         Returns:
             Union[np.ndarray, np.ndarray]: CIE_1931_table
         """
 
-        if self.wavelengths is None:
+        if self.image_mul.wavelengths is None:
             raise ValueError(
-                "Not inicialice variable self.wavelengths charge"
+                "Not inicialice variable self.image_mul.wavelengths charge"
                 + " capture or asign list with values wavelengths"
             )
 
@@ -62,7 +60,7 @@ class ColorReproduction:
         self.illuminant_d65 = []
         self.cie_1931 = []
 
-        for wavelength in self.wavelengths:
+        for wavelength in self.image_mul.wavelengths:
             if wavelength > 780 or wavelength < 380:
                 self.cie_1931.append([wavelength, 0, 0, 0])
                 self.illuminant_d65.append([wavelength, 0])
@@ -127,7 +125,7 @@ class ColorReproduction:
 
             wavelength.append(val)
 
-        self.wavelengths = wavelength
+        self.image_mul.wavelengths = wavelength
 
         self.charge_cie()
 
@@ -155,7 +153,25 @@ class ColorReproduction:
 
         return array_images
 
-    def load_capture(
+    def load_capture(self, path: str, up_cie: bool = True) -> MultiSpectralImage:
+        """
+        Load Capture MultiSpectral Image binary file comunt .micpy .
+
+        if up_wave refresh table cie and d65
+
+        Args:
+            path (str): path file name.
+            up_cie (bool, optional): update the self.image_mul.wavelengths attribute according to
+            the uploaded capture. Defaults is True.
+        """
+
+        self.image_mul.load_image(path)
+        self.size_image = np.shape(self.image_mul.images[0])
+
+        if up_cie is True:
+            self.charge_cie()
+
+    def load_folder_capture(
         self, path: str, num_wave: int, start: int = 0, up_wave: bool = False
     ) -> None:
         """
@@ -167,19 +183,19 @@ class ColorReproduction:
             path (str): Image Folder.
             num_wave (int): number of wavelengths or images per capture.
             start (int, optional): position initial of the first image. Defaults to 0.
-            up_wave (bool, optional): update the self.wavelengths attribute according to
+            up_wave (bool, optional): update the self.image_mul.wavelengths attribute according to
             the uploaded capture. Defaults is True.
         """
         listing = os.listdir(path)
 
         listing = listing[start : start + num_wave]
 
-        self.images, self.matrix_images, self.size_image = fcr.read_capture(
-            path, listing
-        )
+        self.image_mul.images, self.size_image = fcr.read_capture(path, listing)
 
         if up_wave is True:
-            self.wavelengths = self.read_wavelength_capture(listing, self.separators)
+            self.image_mul.wavelengths = self.read_wavelength_capture(
+                listing, self.separators
+            )
 
     def calculate_ecualization(self, mask: np.ndarray, ideal_value: int) -> list:
         """
@@ -194,14 +210,14 @@ class ColorReproduction:
             list: weigths values for wavelength
         """
         means = []
-        for image in self.images:
+        for image in self.image_mul.images:
             parche = image[np.where(mask == 255)]
             mean_patch = np.mean(parche)
             means.append(mean_patch)
 
         equilization_w = np.divide(ideal_value * np.ones(len(means)), np.array(means))
 
-        self.weigths_ecu = equilization_w
+        self.image_mul.ecualization_weigths = equilization_w
         return equilization_w
 
     def reproduccion_cie_1931(
@@ -212,13 +228,20 @@ class ColorReproduction:
 
         Args:
             select_wavelengths (list[int], optional): list the wavelengths per color
-            reproduction. Defaults is self.wavelengths.
+            reproduction. Defaults is self.image_mul.wavelengths.
             output_color_space (str): Espacio de salida ['RGB','XYZ']. to default 'RGB'
         Returns:
             image_RGB(np.ndarray): Image
         """
+        matrix_images = np.zeros((0, np.size(self.image_mul.images[0])))
+
+        for image in self.image_mul.images:
+            matrix_images = np.append(matrix_images, image.reshape((1, -1)), axis=0)
+
+        matrix_images /= 255
+
         if select_wavelengths is None:
-            select_wavelengths = range(np.shape(self.matrix_images)[0])
+            select_wavelengths = range(np.shape(matrix_images)[0])
 
         else:
             select_wavelengths = list(select_wavelengths)
@@ -232,22 +255,22 @@ class ColorReproduction:
             index_wavelengths = []
             for wavelength in select_wavelengths:
                 try:
-                    index = self.wavelengths.index(wavelength)
+                    index = self.image_mul.wavelengths.index(wavelength)
                 except ValueError as error:
                     raise ValueError(
                         f"Not Wavelength {wavelength} "
-                        + f"in self.wavelengths : {self.wavelengths}"
+                        + f"in self.image_mul.wavelengths : {self.image_mul.wavelengths}"
                     ) from error
 
                 index_wavelengths.append(index)
 
             select_wavelengths = index_wavelengths
 
-        if self.weigths_ecu is None:
+        if self.image_mul.ecualization_weigths is None:
             pesos_ecu = np.ones(len(select_wavelengths))
 
         else:
-            pesos_ecu = self.weigths_ecu[select_wavelengths]
+            pesos_ecu = self.image_mul.ecualization_weigths[select_wavelengths]
 
         # Coeficientes
         esc = (np.ones((3, 1)) * self.illuminant_d65[select_wavelengths, 1].T).T
@@ -258,9 +281,7 @@ class ColorReproduction:
         shape_imag.append(3)
         # Reproduccion de color usando CIE
 
-        xyz = np.dot(
-            coef, (self.matrix_images[select_wavelengths, :].T * pesos_ecu).T
-        ).T
+        xyz = np.dot(coef, (matrix_images[select_wavelengths, :].T * pesos_ecu).T).T
         xyz = xyz / sum_n[1]
 
         if output_color_space.upper() == "XYZ":

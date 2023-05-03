@@ -14,7 +14,7 @@ IDEAL_VALUE = 243
 
 color_obj = ColorReproduction()
 color_obj.separators = SEPARATORS
-color_obj.load_capture(FOLDER, NUM_WAVES, up_wave=True)
+color_obj.load_folder_capture(FOLDER, NUM_WAVES, up_wave=True)
 
 color_correc = ColorCorrection()
 color_correc.color_checker_detection(color_obj.images, imshow="end")

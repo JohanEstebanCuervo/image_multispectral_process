@@ -136,7 +136,7 @@ def extrac_circles(
 color = ColorReproduction()
 color.separators = SEPARATORS
 
-color.load_capture(FOLDER, NUM_WAVES, up_wave=True)
+color.load_folder_capture(FOLDER, NUM_WAVES, up_wave=True)
 
 color_correc = ColorCorrection()
 color_correc.load_nn(PATH_RED)
