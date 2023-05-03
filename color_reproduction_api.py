@@ -204,18 +204,19 @@ class ColorReproduction:
         self.weigths_ecu = equilization_w
         return equilization_w
 
-    def reproduccion_cie_1931(self, select_wavelengths: list[int] = None) -> np.ndarray:
+    def reproduccion_cie_1931(
+        self, select_wavelengths: list[int] = None, output_color_space: str = "RGB"
+    ) -> np.ndarray:
         """
         Reproduce Color CIE 1931.
 
         Args:
             select_wavelengths (list[int], optional): list the wavelengths per color
             reproduction. Defaults is self.wavelengths.
-
+            output_color_space (str): Espacio de salida ['RGB','XYZ']. to default 'RGB'
         Returns:
-            image_RGB(np.ndarray): Image in RGB type uint8
+            image_RGB(np.ndarray): Image
         """
-
         if select_wavelengths is None:
             select_wavelengths = range(np.shape(self.matrix_images)[0])
 
@@ -253,6 +254,8 @@ class ColorReproduction:
         coef = (self.cie_1931[select_wavelengths, 1:] * esc).T
         sum_n = np.sum(coef, axis=1)
 
+        shape_imag = list(self.size_image)
+        shape_imag.append(3)
         # Reproduccion de color usando CIE
 
         xyz = np.dot(
@@ -260,9 +263,13 @@ class ColorReproduction:
         ).T
         xyz = xyz / sum_n[1]
 
-        rgb = transforms.xyz2rgb(xyz)
-        shape_imag = list(self.size_image)
-        shape_imag.append(3)
-        im_rgb = np.reshape(rgb, shape_imag)
+        if output_color_space.upper() == "XYZ":
+            return np.reshape(xyz, shape_imag)
 
-        return im_rgb
+        elif output_color_space.upper() == "RGB":
+            rgb = transforms.xyz2rgb(xyz)
+            return np.reshape(rgb, shape_imag).astype("uint8")
+        else:
+            raise ValueError(
+                f"No color space output: {output_color_space}. or 'RGB','XYZ'"
+            )

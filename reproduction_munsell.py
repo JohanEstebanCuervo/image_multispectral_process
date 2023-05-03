@@ -12,12 +12,13 @@ from methods.color_repro import imshow
 
 # %% Datos entrada
 
-FOLDER = r"imgs\2023_4_11_16_4"
+FOLDER = r"imgs\munsell_3"
 NUM_WAVES = 8
 PATH_RED = "redes_entrenadas/Correction_color_neuronal_red_2.22.h5"
-SEPARATORS = [r"\_", r"n"]  # Si esta entre parentesis puede asignar None
+SEPARATORS = [r"\_", r" "]  # Si esta entre parentesis puede asignar None
 NUM_MASK = 18
 IDEAL_VALUE = 243
+
 
 if __name__ == "__main__":
     # %% Inicialización de objetos
@@ -25,8 +26,8 @@ if __name__ == "__main__":
     color = ColorReproduction()
     color.separators = SEPARATORS
 
-    color.load_capture(FOLDER, NUM_WAVES, up_wave=True)
-
+    color.load_capture(FOLDER, NUM_WAVES, up_wave=True, start=0)
+    print(color.wavelengths)
     color_correc = ColorCorrection()
     color_correc.load_nn(PATH_RED)
 

@@ -462,7 +462,7 @@ def color_checker_detection(
     Returns:
         list[np.ndarray]: list masks patchs colorchecker
     """
-    image = images_list[0]
+    image = images_list[1].copy()
     if imshow is True:
         func.imshow("imagen", image.astype("uint8"))
 
@@ -518,7 +518,6 @@ def color_checker_detection(
         func.imshow("masks", mask_number)
 
     if imshow is True or str(imshow).lower() == "end":
-
         image[np.where(mask_number == 255)] = 255
         image[np.where(mask_number == 1)] = 1
         func.imshow("imagen con masks", image)
